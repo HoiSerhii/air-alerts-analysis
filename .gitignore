@@ -1,0 +1,14 @@
+# Data is downloaded fresh by pipeline.py and never committed
+# (large, updates daily, and is someone else's dataset to host).
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
