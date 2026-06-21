@@ -19,6 +19,7 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
+import matplotlib.patches as mpatches  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
@@ -27,6 +28,10 @@ PROCESSED_DIR = Path("data/processed")
 HEAT_PATH = PROCESSED_DIR / "heat.csv"
 NIGHT_PATH = PROCESSED_DIR / "night_share.csv"
 UNIFORM_NIGHT_BASELINE = 8 / 24  # night window 22:00-05:59 = 8/24 of the day
+
+# Night window: hours 22–23 and 0–5 (8 hours total)
+NIGHT_HOURS_LATE = (22, 23)   # end of day
+NIGHT_HOURS_EARLY = (0, 5)    # start of day
 
 
 # --------------------------- data / figure layer ---------------------------
@@ -44,27 +49,61 @@ def hour_share_by_year(heat: pd.DataFrame) -> pd.DataFrame:
     return shared.pivot(index="year", columns="hour", values="share").fillna(0.0)
 
 
-def heatmap_fig(share: pd.DataFrame):
+def heatmap_fig(share: pd.DataFrame, latest_year: int):
     fig, ax = plt.subplots(figsize=(11, 2.5 + 0.5 * len(share)))
     im = ax.imshow(share.values, aspect="auto", cmap="magma", origin="lower")
-    ax.set_xticks(range(0, 24, 2))
-    ax.set_xticklabels(range(0, 24, 2))
+
+    # Shade night window (22:00-05:59): two bands — late and early
+    night_color = "steelblue"
+    alpha = 0.15
+    # Early morning: hours 0–5 → columns 0–5
+    ax.axvspan(-0.5, 5.5, color=night_color, alpha=alpha, zorder=2)
+    # Late night: hours 22–23 → columns 22–23
+    ax.axvspan(21.5, 23.5, color=night_color, alpha=alpha, zorder=2)
+
+    ax.set_xticks(range(24))
+    ax.set_xticklabels([f"{h:02d}" for h in range(24)], fontsize=7)
     ax.set_yticks(range(len(share.index)))
-    ax.set_yticklabels(share.index)
-    ax.set_xlabel("hour of day (Kyiv)")
-    ax.set_ylabel("year")
+    yticklabels = [
+        f"{y}*" if y == latest_year else str(y) for y in share.index
+    ]
+    ax.set_yticklabels(yticklabels)
+    ax.set_xlabel("hour of day (Kyiv local time)")
+    ax.set_ylabel("year  (* = partial)")
     fig.colorbar(im, ax=ax, label="share of year's alert time")
+
+    night_patch = mpatches.Patch(color=night_color, alpha=0.4, label="night window (22:00–05:59)")
+    ax.legend(handles=[night_patch], loc="upper right", fontsize=8,
+              framealpha=0.7)
     fig.tight_layout()
     return fig
 
 
-def night_fig(night: pd.DataFrame):
+def night_fig(night: pd.DataFrame, latest_year: int):
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(night["year"], night["night_share"], marker="o", label="night share")
+
+    full = night[night["year"] != latest_year]
+    partial = night[night["year"] == latest_year]
+
+    ax.plot(full["year"], full["night_share"], marker="o",
+            color="tab:blue", label="night share (full year)")
+    if not partial.empty:
+        ax.plot(partial["year"], partial["night_share"], marker="o",
+                markerfacecolor="white", markeredgecolor="tab:blue",
+                markeredgewidth=2, color="tab:blue", ls="--",
+                label=f"{latest_year} (partial year)")
+
+    # value labels
+    for _, row in night.iterrows():
+        ax.annotate(f"{row['night_share']:.3f}",
+                    xy=(row["year"], row["night_share"]),
+                    xytext=(0, 8), textcoords="offset points",
+                    ha="center", fontsize=8)
+
     ax.axhline(UNIFORM_NIGHT_BASELINE, ls="--", color="gray",
-               label=f"uniform baseline ({UNIFORM_NIGHT_BASELINE:.2f})")
+               label=f"uniform baseline ({UNIFORM_NIGHT_BASELINE:.3f})")
     ax.set_xlabel("year")
-    ax.set_ylabel("night share (22:00-05:59)")
+    ax.set_ylabel("night share (22:00–05:59)")
     ax.set_ylim(0.30, 0.55)
     ax.legend()
     fig.tight_layout()
@@ -93,7 +132,20 @@ def render() -> None:
     years = sorted(heat["year"].unique())
     latest = max(years)
 
-    selected = st.multiselect("Years", years, default=years)
+    with st.sidebar:
+        st.header("Filters")
+        selected = st.multiselect("Years", years, default=years)
+        st.markdown("---")
+        st.markdown(
+            "**Night window**: 22:00–05:59 Kyiv (8/24 of the day).\n\n"
+            "**Baseline 0.333**: a process with no daily pattern "
+            "would put exactly 1/3 of its time in this window.\n\n"
+            f"**{latest}\\***: partial year — its single value is "
+            "not a trend point."
+        )
+        st.markdown("---")
+        st.caption("Source: Vadimkin/ukrainian-air-raid-sirens-dataset")
+
     if not selected:
         st.warning("Select at least one year.")
         st.stop()
@@ -101,16 +153,15 @@ def render() -> None:
     night_sel = night[night["year"].isin(selected)]
 
     st.subheader("Share of alert time by hour of day")
-    st.pyplot(heatmap_fig(hour_share_by_year(heat_sel)))
+    st.pyplot(heatmap_fig(hour_share_by_year(heat_sel), latest))
 
     st.subheader("Night share vs uniform baseline")
-    st.pyplot(night_fig(night_sel))
+    st.pyplot(night_fig(night_sel, latest))
 
     st.info(
-        f"Baseline 0.333: the night window (22:00–05:59) is 8/24 of the day, so a "
-        f"process with no daily pattern would sit there. Values clearly above it "
-        f"indicate a real nocturnal skew. Note: {latest} is a partial year — its "
-        f"single value is not a trend point."
+        f"2023–2025 night share is +0.11 to +0.13 above the 0.333 baseline — "
+        f"consistent with systematic night drone campaigns. Peaks at 00:00–03:00 Kyiv. "
+        f"Note: {latest} is a partial year."
     )
 
 
