@@ -138,7 +138,7 @@ src/aggregate.py  L1 -> L2: oblast union + hourly coverage marts
 src/analysis.py   L2 -> answer: hour-share, night-share vs baseline, sanity plot
 pipeline.py       orchestrate + persist marts to data/processed/
 sanity_check.py   end-to-end acceptance gate
-app.py            Streamlit dashboard (Phase B, built in Claude Code)
+app.py            Streamlit dashboard (skeleton provided; polished in Claude Code)
 ```
 
 Commands: `python pipeline.py` (build), `python sanity_check.py` (verify),

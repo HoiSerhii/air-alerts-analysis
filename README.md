@@ -25,7 +25,7 @@ structure and stay honest about what is irreducibly unpredictable.
 pip install -r requirements.txt
 python pipeline.py       # downloads the data, builds marts under data/processed/
 python sanity_check.py   # acceptance gate — should print ".. 0 failed"
-streamlit run app.py     # dashboard (built in the dashboard phase)
+streamlit run app.py     # interactive dashboard
 ```
 
 ## How it works — and the traps it avoids
@@ -54,6 +54,7 @@ src/aggregate.py  L1 -> L2: oblast union + hourly coverage marts
 src/analysis.py   L2 -> answer: hour-share, night-share vs baseline, sanity plot
 pipeline.py       orchestrate + persist marts
 sanity_check.py   end-to-end acceptance gate
+app.py            Streamlit dashboard (reads data/processed/*.csv)
 sample/           tiny CSV fixture for offline testing
 spec.md           the project contract and rationale
 ```

@@ -43,17 +43,20 @@ silently adapt the code to drifted data; update the spec/invariants deliberately
 - Prefer the smallest change that works over a more general abstraction.
 
 ## Phase B — your job here: the dashboard (`app.py`)
-Build a simple Streamlit app that reads the persisted marts (do **not** recompute
-the pipeline on every view):
+A working, tested skeleton `app.py` is already provided. Review it, run it
+(`streamlit run app.py`), and polish the UX — do **not** rebuild it from scratch.
+It reads the persisted marts (it must not recompute the pipeline):
 - `data/processed/heat.csv`        — year × hour-of-day coverage minutes
 - `data/processed/night_share.csv` — night share per year + the 0.333 baseline
 
-Two views:
-1. Hour-of-day heatmap. Normalise each year to a *share* (year sums to 1) so years
+Two views (already implemented):
+1. Hour-of-day heatmap, each year normalised to a *share* (year sums to 1) so years
    with very different attack volumes are comparable.
 2. Night-share trend vs the dashed 0.333 uniform baseline.
 
-Label hours as Kyiv local time. Iterate on UX live. Keep it to one file.
+Hours are Kyiv local time. Keep it to one file and add no new dependencies. Verify
+the views match the proven numbers (night share +0.11..+0.13 over baseline for
+2023–2025, peaks 00:00–03:00) before iterating on UX.
 
 ## File map
 ```
@@ -64,6 +67,7 @@ src/aggregate.py  L1 -> L2 (oblast union + coverage marts)
 src/analysis.py   L2 -> answer (hour-share, night-share, sanity plot)
 pipeline.py       orchestrate + persist marts
 sanity_check.py   acceptance gate (DI/CP/TZ/MID/UNI/RES)
+app.py            Streamlit dashboard (provided skeleton)
 sample/           tiny committed CSV fixture for offline tests
 spec.md           the contract + rationale
 ```
